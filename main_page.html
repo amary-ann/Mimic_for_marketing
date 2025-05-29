@@ -150,11 +150,11 @@
 		async function fetchProductImage(productId) {
 			try {
 				const imagesData = {
-					"1": "elena-taranukhina-G8SrS1ewVXM-unsplash.jpg",
-					"2": "sebastian-coman-photography-QcerUj-jYig-unsplash.jpg",
-					"3": "cliffer-rebelo-6AfOw_faeYc-unsplash.jpg",
-					"4": "shuvro-mojumder-nU8e2R6RaI0-unsplash.jpg",
-					"5": "byron-breytenbach-t9N6WCG47QI-unsplash.jpg",
+					"1": "frontend/icons8-handshake.gif",
+					"2": "frontend/icons8-tick.gif",
+					"3": "frontend/profile-user.png",
+					"4": "frontend/wave.gif",
+					"5": "frontend/izifin_logo.jpg",
 					"6": "adi-goldstein-xKS-1DP4g7A-unsplash.jpg",
 					"7": "marc-babin-dXMydfrmUB8-unsplash.jpg",
 					"8": "imad-786-qla1_604R4c-unsplash.jpg",
@@ -183,12 +183,14 @@
 			try {
 				// Mock response for testing (simulating a real API)
 				const data = [
-				{ "value": "1", "label": "New Customers" },
-				{ "value": "2", "label": "Resurrected Customers" },
-				{ "value": "3", "label": "Contracted Customers" },
-				{ "value": "4", "label": "Expanded Customers" },
-				{ "value": "5", "label": "Churned Customers" },
-				{ "value": "6", "label": "Top Customers" },
+				{ "value": "new", "label": "New Customers" },
+				{ "value": "resurrection", "label": "Resurrected Customers" },
+				{ "value": "returning", "label": "Returning Customers" },
+				{ "value": "contraction", "label": "Contracted Customers" },
+				{ "value": "expansion", "label": "Expanded Customers" },
+				{ "value": "churn", "label": "Churned Customers" },
+				{ "value": "top", "label": "Top Customers" },
+				{ "value": "bottom", "label": "Bottom Customers" }
 				];
 
 				// Get the <select> element by its ID
@@ -540,27 +542,40 @@
 
     if (inputProductRadio.checked) {
         // Fetch value from the Input Product field
-        productValue = document.getElementById('prda').value;
+        productValue = document.getElementById('prda').textContent;
     } else if (productListRadio.checked) {
         // Fetch value from the Product List dropdown
         const productDropdown = document.getElementById('productdropdown');
-        productValue = productDropdown.value;
+		const selectedOption = productDropdown.options[productDropdown.selectedIndex];
+		productValue = selectedOption.textContent;
+        // productValue = productDropdown.textContent;
     }
 
     return productValue;
 }
-function getCustomerValue() {
+
+function decodeBase64ToCSV(base64String) {
+    const decodedString = atob(base64String);
+    return decodedString;
+}
+async function getCustomerValue() {
     // Check which radio button is selected
     const uploadCustomerRadio = document.querySelector('input[name="customer-group"][value="option1"]');
     const customerGroupRadio = document.querySelector('input[name="customer-group"][value="option2"]');
     let customerValue = '';
+	let group='';
 
     if (uploadCustomerRadio.checked) {
         // Fetch the file from the input field
         const customerFileInput = document.getElementById('customer-data-upload');
         const file = customerFileInput.files[0];
+
         if (file) {
-            customerValue = file.name; // Use the file name or other file properties
+             // Use the file name or other file properties
+			group = 'manual';
+			customerValue = await readFileAsBase64(file);
+			const csvContent = decodeBase64ToCSV(customerValue);
+			console.log(csvContent);
         } else {
             alert('Please upload a file!');
             return null;
@@ -569,14 +584,72 @@ function getCustomerValue() {
         // Fetch the value from the Customer Group dropdown
         const customerDropdown = document.getElementById('customerdropdown');
         customerValue = customerDropdown.value;
+		group="automatic";
+		console.log(customerValue);
     }
 
-    return customerValue;
+    return [group,customerValue];
 }
 
+async function readFileAsBase64(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+		reader.readAsDataURL(file);
+        reader.onload = function (event) {
+            const base64String = reader.result.split(',')[1]; // Remove metadata prefix
+            resolve(base64String);
+        };
+        reader.onerror = function (error) {
+            reject(error);
+        };
+    
+    });
+}
+
+async function getBase64ProductImage() {
+    const uploadInput = document.getElementById("product-image-upload");
+    const imageTag = document.getElementById("productImage");
+
+    // If file uploaded
+    if (uploadInput && uploadInput.files && uploadInput.files.length > 0) {
+        const file = uploadInput.files[0];
+        return await convertFileToBase64(file);
+    }
+
+    // If image is fetched and shown in the <img>
+    const imageUrl = imageTag.src;
+
+    if (imageUrl && !imageUrl.startsWith('data:')) {
+        const response = await fetch(imageUrl);
+        const blob = await response.blob();
+        return await convertBlobToBase64(blob);
+    }
+
+    return ''; // No image
+}
+
+function convertFileToBase64(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);  // returns base64 string
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
+}
+
+function convertBlobToBase64(blob) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+    });
+}
 
 	document.querySelector(".discount-form").addEventListener("submit", async function(event) {
 	event.preventDefault();
+
+			const businessId = 118;
 
 			const product_name = getProductValue();
 
@@ -586,7 +659,7 @@ function getCustomerValue() {
 
 			const discount_type = document.querySelector('#discountType').value;
 
-			const customer_grp = getCustomerValue();
+			const [customer_grp_type, customer_grp] = await getCustomerValue();
 
 			const k_customers = document.querySelector('#k_customers').value;
 			
@@ -599,22 +672,27 @@ function getCustomerValue() {
 			const discounted_amount = document.querySelector('#discounted-amount').value;
 			
 			const cta = document.querySelector('#call-to-action').value;
+
+			const img = await getBase64ProductImage();
 			
 			
-			const token = localStorage.getItem('accessToken')
-			const type = 'discount'
+			// const token = localStorage.getItem('accessToken')
+			// const type = 'discount'
 			
 
-			const payload = { ProductName: product_name,  ProductDescription: product_description, DiscountOffer: parseFloat(discount_value), DiscountType: discount_type, Customer:customer_grp, KCustomers:k_customers, StartDate: discount_start,  EndDate: discount_end, OriginalPrice : parseFloat(original_amount),  DiscountedPrice :  discounted_amount, Cta : cta, Token: token  } ;
+			const payload = { BusinessId:businessId, ProductName: product_name,  ProductDescription: product_description,
+				Type:"percent",
+				DiscountOffer: parseFloat(discount_value), DiscountType: discount_type, CustomerGroup:customer_grp, 
+				CustomerGroupType:customer_grp_type,KCustomers:parseFloat(k_customers), StartDate: discount_start,  EndDate: discount_end, OriginalPrice : parseFloat(original_amount),  DiscountPrice :  parseFloat(discounted_amount), Cta : cta, Image: img} ;
 
 			console.log(JSON.stringify(payload))
 
-			const url = 'https://your-backend-endpoint.com/api/customers'
+			const url = 'https://marketing-endpoint-4oxu.onrender.com/NewCampaign';
 			const response = await fetch(url, {
 				method: 'POST',
+				mode: 'cors',
 				headers: {
 					'Content-Type': 'application/json',
-					'Authorization': 'Bearer ' + token
 				},
 				
 				body: JSON.stringify(payload)
@@ -623,17 +701,17 @@ function getCustomerValue() {
 
 
 
-		if (response.ok) {
-			const data = await response.json();
-			localStorage.setItem('copy', data.response )
-			localStorage.setItem('businessId', data.id )
-			window.location.href = 'Campaign Page.html';
+		// if (response.ok) {
+		// 	const data = await response.json();
+		// 	localStorage.setItem('copy', data.response )
+		// 	localStorage.setItem('businessId', data.id )
+		// 	window.location.href = 'Campaign Page.html';
 			
 			
-		} else {
-			document.querySelector('.campaignStatus').innerText = 'Failed to create campaign, Please try again later.';
-			// console.log("Login failed. Please check your credentials")
-		}
+		// } else {
+		// 	document.querySelector('.campaignStatus').innerText = 'Failed to create campaign, Please try again later.';
+		// 	// console.log("Login failed. Please check your credentials")
+		// }
 	});
 
 </script>
